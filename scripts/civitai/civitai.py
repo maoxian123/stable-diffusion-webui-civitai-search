@@ -69,15 +69,17 @@ def download_models_pre(tag, types, nsfw, sort, page_num, per_page_num):
                         allcount += 1
                 elif nsfw == False:
                     allcount += 1
-                res.append(("{}/{}.jpg".format(dir_name, item["id"]), f'{item["id"]}'))
+                
                 if os.path.exists("{}/{}.jpg".format(dir_name, item["id"])):
                     # print("Image {} already exists".format(item['id']))
+                    res.append(("{}/{}.jpg".format(dir_name, item["id"]), f'{item["id"]}'))
                     continue
                 try:
                     download_url=item["modelVersions"][0]["images"][0]["url"]
                     if download_url:
                         download_urls.append(download_url)
                         save_names.append(item["id"])
+                        res.append(("{}/{}.jpg".format(dir_name, item["id"]), f'{item["id"]}'))
                 except IndexError:
                     print("Error: item does not have the expected property")
                     continue
