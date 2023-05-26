@@ -1,6 +1,11 @@
 import gradio as gr
 import requests
-from scripts.civitai.civitai import download_models_pre, download_detail, tags_get
+from scripts.civitai.civitai import (
+    download_models_pre,
+    download_detail,
+    tags_get,
+    current_ext_dir,
+)
 from scripts.civitai.civitai_utils import (
     load_all_image_local,
     load_image_prompts,
@@ -84,10 +89,10 @@ def get_all_download_model(type):
 
 def load_all_image_localcache_fn(types):
     dir = os.path.join(
-        Path().absolute(),
-        f"extensions\\stable-diffusion-webui-extension-civitai-search\\{types}",
+        current_ext_dir,
+        types,
     )
-    return load_all_image_local(dir,True)
+    return load_all_image_local(dir, True)
 
 
 def select_local_detail_fn(evt: gr.SelectData):

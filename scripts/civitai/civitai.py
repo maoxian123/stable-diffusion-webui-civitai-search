@@ -4,7 +4,7 @@ import time
 import concurrent.futures
 from .civitai_utils import download_images, download_tag_images
 from pathlib import Path
-
+current_ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def download_models_pre(tag, types, nsfw, sort, page_num, per_page_num):
     allcount = 0
     download_urls = []
@@ -40,7 +40,7 @@ def download_models_pre(tag, types, nsfw, sort, page_num, per_page_num):
 
     print(query_params)
 
-    dir_name=os.path.join(Path().absolute(),f"extensions\\stable-diffusion-webui-extension-civitai-search\\{types}")
+    dir_name=os.path.join(current_ext_dir,types)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
     print(dir_name)
@@ -105,7 +105,7 @@ def download_detail(modelid, types):
         save_dir = "Detail_Stable-diffusion"
     if types == "LORA":
         save_dir = "Detail_Lora"
-    save_dir=os.path.join(Path().absolute(),f"extensions\\stable-diffusion-webui-extension-civitai-search\\{save_dir}")
+    save_dir=os.path.join(current_ext_dir,save_dir)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     print(save_dir)
