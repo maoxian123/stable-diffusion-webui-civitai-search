@@ -1,0 +1,2 @@
+### civitai search and view
+[qq群:836919052](http://qm.qq.com/cgi-bin/qm/qr?_wv=1027&k=pUm4cO27AWmAKsqCISIky-A2zwiZKApO&authKey=VT1kyhD%2FqjVcrDHswW1hXxeHVJcQ4%2FjYrnJKy5bsrBdt1JxeASgLQg8tF2CAm0tI&noverify=0&group_code=836919052)
