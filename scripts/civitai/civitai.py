@@ -5,7 +5,7 @@ import concurrent.futures
 from .civitai_utils import download_images, download_tag_images
 from pathlib import Path
 current_ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-def download_models_pre(tag, types, nsfw, sort, page_num, per_page_num):
+def download_models_pre(name,tag, types, nsfw, sort, page_num, per_page_num):
     allcount = 0
     download_urls = []
     save_names = []
@@ -17,11 +17,16 @@ def download_models_pre(tag, types, nsfw, sort, page_num, per_page_num):
         "limit": per_page_num,
         "page": page_num,
         "tag": "cute",
+        "query":"name",
         "types": "Checkpoint",
         "sort": sort,  # Newest Most Downloaded Highest Rated
         "period": "AllTime",
         "nsfw": "true",
     }
+    if name:
+        query_params["query"] = name
+    else:
+        del query_params["query"]
     if tag:
         query_params["tag"] = tag
     else:
@@ -45,11 +50,17 @@ def download_models_pre(tag, types, nsfw, sort, page_num, per_page_num):
         os.makedirs(dir_name)
     print(dir_name)
 
+    req_count=0
+    req_max_count=5
     while True:
         try:
-            response = requests.get(url, params=query_params)
+            req_count+=1
+            response = requests.get(url, params=query_params,timeout=5)
             break
         except requests.exceptions.RequestException as e:
+            if req_count >= req_max_count:
+                print("req>5 check your network")
+                return res
             time.sleep(1)
             continue
 
@@ -113,11 +124,17 @@ def download_detail(modelid, types):
     print(save_dir)
     res = []
     url = "https://civitai.com/api/v1/models/" + str(modelid)
+    req_count=0
+    req_max_count=5
     while True:
         try:
+            req_count+=1
             response = requests.get(url)
             break
         except requests.exceptions.RequestException as e:
+            if req_count >= req_max_count:
+                print("req>5 check your network")
+                return res
             time.sleep(1)
             continue
     if response.status_code == 200:

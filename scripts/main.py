@@ -18,14 +18,16 @@ import webbrowser
 from modules import script_callbacks, scripts
 
 
-def download_models_pre_fn(tag, types, nsfw, sort, page_num, per_page_num):
+def download_models_pre_fn(name,tag, types, nsfw, sort, page_num, per_page_num):
+    if name == None or name == "":
+        name = None
     if tag == None or tag == "":
         tag = None
     if types == None or types == "":
         types = "Checkpoint"
     if nsfw == None or nsfw == "":
         nsfw = None
-    return download_models_pre(tag, types, nsfw, sort, int(page_num), int(per_page_num))
+    return download_models_pre(name,tag, types, nsfw, sort, int(page_num), int(per_page_num))
 
 
 download_url = ""
@@ -101,8 +103,9 @@ def select_local_detail_fn(evt: gr.SelectData):
 
 def on_ui_tabs():
     with gr.Blocks() as grapp:
-        with gr.Tab("model、lora 预览图下载"):
-            input_text = gr.inputs.Textbox(label="Enter a search tag")
+        with gr.Tab("model、lora 预览",elem_id="civitai_preview"):
+            name_input_text = gr.inputs.Textbox(label="根据name搜索")
+            tag_input_text = gr.inputs.Textbox(label="根据tag搜索")
             with gr.Row():
                 type_dropdown = gr.inputs.Dropdown(
                     label="类型选择", choices=["Checkpoint", "LORA"], default="Checkpoint"
@@ -120,7 +123,7 @@ def on_ui_tabs():
             button = gr.Button(value="搜索")
             button3 = gr.Button(value="加载已缓存的")
             gallery = gr.Gallery(
-                label="images", show_label=True, elem_id="gallery1"
+                label="预览", show_label=True, elem_id="gallery1"
             ).style(columns=[5], object_fit="contain", height="auto")
 
         with gr.Tab("查看详细信息"):
@@ -128,12 +131,18 @@ def on_ui_tabs():
             dropdown2 = gr.inputs.Dropdown(
                 label="类型选择", choices=["Checkpoint", "LORA"], default="Checkpoint"
             )
-            image_prompts = gr.inputs.Textbox(label="image prompts")
+            
+            with gr.Row(elem_id="detail_prompts"):
+                image_prompts = gr.inputs.Textbox(label="image prompts")
+            detail_send_t2i=gr.Button(value="发送到文生图")
+            
+            with gr.Row():
+                button2 = gr.Button(value="预览")
+                button4 = gr.Button(value="下载")
             gallery2 = gr.Gallery(
-                label="images", show_label=True, elem_id="gallery2"
+                label="详细信息", show_label=True, elem_id="gallery2"
             ).style(columns=[5], object_fit="contain", height="auto")
-            button2 = gr.Button(value="预览")
-            button4 = gr.Button(value="下载")
+            
 
         with gr.Tab("tags搜索") as tab3:
             tag_input = gr.inputs.Textbox(label="Enter a search tag or null for all")
@@ -144,22 +153,26 @@ def on_ui_tabs():
             res_text = gr.outputs.Textbox(label="搜索结果")
 
         with gr.Tab("查看已经下载的model和lora"):
-            local_type_dropdown = gr.inputs.Dropdown(
-                label="类型选择", choices=["Checkpoint", "LORA"], default="Checkpoint"
-            )
-            local_image_prompts = gr.inputs.Textbox(label="image prompts")
-            button_load_local = gr.Button(value="加载")
+            with gr.Row():
+                local_type_dropdown = gr.inputs.Dropdown(
+                    label="类型选择", choices=["Checkpoint", "LORA"], default="Checkpoint"
+                )
+                button_load_local = gr.Button(value="加载")
+            with gr.Row(elem_id="local_prompts"):
+                local_image_prompts = gr.inputs.Textbox(label="image prompts")
+            local_send_t2i=gr.Button(value="发送到文生图")
             gallery3 = gr.Gallery(
-                label="images", show_label=True, elem_id="gallery3"
+                label="模型列表", show_label=True, elem_id="gallery3"
             ).style(columns=[5], object_fit="contain", height="auto")
             gallery4 = gr.Gallery(
-                label="images", show_label=True, elem_id="gallery4"
+                label="对应的具体信息", show_label=True, elem_id="gallery4"
             ).style(columns=[5], object_fit="contain", height="auto")
-
+        
         button.click(
             fn=download_models_pre_fn,
             inputs=[
-                input_text,
+                name_input_text,
+                tag_input_text,
                 type_dropdown,
                 nsfw_checkbox,
                 sort_dropdown,
@@ -193,7 +206,13 @@ def on_ui_tabs():
         )
         gallery3.select(fn=select_local_detail_fn, outputs=gallery4)
         gallery4.select(fn=view_selected_prompts, outputs=[local_image_prompts])
-
+        
+        detail_send_t2i.click(fn=None, _js=f"detail_text_send_t2i")
+        local_send_t2i.click(fn=None, _js=f"local_text_send_t2i")
+        
+        detail_send_t2i.click(fn=None, _js=f"switch_to_txt2img")
+        local_send_t2i.click(fn=None, _js=f"switch_to_txt2img")
+        
         return [(grapp, "Civitai Search", "civitai search")]
 
 
