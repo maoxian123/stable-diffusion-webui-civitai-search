@@ -2,14 +2,20 @@ import requests
 import os
 import time
 import concurrent.futures
-from .civitai_utils import download_images, download_tag_images
-from pathlib import Path
-current_ext_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-def download_models_pre(name,tag, types, nsfw, sort, page_num, per_page_num):
+from .civitai_utils import download_images, download_images_and_prompts, format_name
+
+current_ext_dir = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+req_max_count = 5
+
+
+def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
     allcount = 0
     download_urls = []
     save_names = []
     res = []
+    model_ids=[]
     url = "https://civitai.com/api/v1/models"
     futures = []
     # porn nsfw sex sexy nude naked
@@ -17,7 +23,7 @@ def download_models_pre(name,tag, types, nsfw, sort, page_num, per_page_num):
         "limit": per_page_num,
         "page": page_num,
         "tag": "cute",
-        "query":"name",
+        "query": "name",
         "types": "Checkpoint",
         "sort": sort,  # Newest Most Downloaded Highest Rated
         "period": "AllTime",
@@ -37,25 +43,24 @@ def download_models_pre(name,tag, types, nsfw, sort, page_num, per_page_num):
     else:
         del query_params["types"]
 
-    # 如果nsfw为true 则只要nsfw=true的图片，否则直接去掉nsfw参数，下载所有类型图片
-    if nsfw == True:
-        query_params["nsfw"] = "true"
-    else:
+    if nsfw == "all":
         del query_params["nsfw"]
+    elif nsfw == "nsfw=true":
+        query_params["nsfw"] = "true"
+    elif nsfw == "nsfw=false":
+        query_params["nsfw"] = "false"
 
     print(query_params)
 
-    dir_name=os.path.join(current_ext_dir,types)
+    dir_name = os.path.join(current_ext_dir, types)
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
-    print(dir_name)
 
-    req_count=0
-    req_max_count=5
+    req_count = 0
     while True:
         try:
-            req_count+=1
-            response = requests.get(url, params=query_params,timeout=5)
+            req_count += 1
+            response = requests.get(url, params=query_params, timeout=5)
             break
         except requests.exceptions.RequestException as e:
             if req_count >= req_max_count:
@@ -72,25 +77,34 @@ def download_models_pre(name,tag, types, nsfw, sort, page_num, per_page_num):
             return res
         for item in models["items"]:
             try:
-                if nsfw == True:
+                if nsfw == "nsfw=true":
                     if item["nsfw"] == False:
-                        print("nsfw is false")
                         continue
                     else:
                         allcount += 1
-                elif nsfw == False:
+                elif nsfw == "nsfw=false":
+                    if item["nsfw"] == True:
+                        continue
+                    else:
+                        allcount += 1
+                else:
                     allcount += 1
-                
-                if os.path.exists("{}/{}.jpg".format(dir_name, item["id"])):
-                    # print("Image {} already exists".format(item['id']))
-                    res.append(("{}/{}.jpg".format(dir_name, item["id"]), f'{item["id"]}'))
+                item["name"] = format_name(item["name"])
+                image_save_name = "{}/{}.jpg".format(
+                    dir_name, item["name"] + "-" + str(item["id"])
+                )
+                if os.path.exists(image_save_name):
+                    #already downloaded
+                    res.append((image_save_name, item["name"]))
+                    model_ids.append(item["id"])
                     continue
                 try:
-                    download_url=item["modelVersions"][0]["images"][0]["url"]
+                    download_url = item["modelVersions"][0]["images"][0]["url"]
                     if download_url:
                         download_urls.append(download_url)
-                        save_names.append(item["id"])
-                        res.append(("{}/{}.jpg".format(dir_name, item["id"]), f'{item["id"]}'))
+                        save_names.append(image_save_name)
+                        model_ids.append(item["id"])
+                        res.append((image_save_name, item["name"]))
                 except IndexError:
                     print("Error: item does not have the expected property")
                     continue
@@ -102,33 +116,27 @@ def download_models_pre(name,tag, types, nsfw, sort, page_num, per_page_num):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         for i, url in enumerate(download_urls):
-            future = executor.submit(
-                download_images, url, types, dir_name, save_names[i]
-            )
+            future = executor.submit(download_images, url, save_names[i])
             futures.append(future)
     concurrent.futures.wait(futures)
-    return res
+    return res,model_ids
 
 
 def download_detail(modelid, types):
     save_dir = ""
-    res_save_path = ""
-    res_download_url = ""
-    if types == "Checkpoint":
-        save_dir = "Detail_Stable-diffusion"
-    if types == "LORA":
-        save_dir = "Detail_Lora"
-    save_dir=os.path.join(current_ext_dir,save_dir)
+    res_model_download_url = ""
+    save_model_path = ""
+    save_dir = os.path.join(current_ext_dir, types)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     print(save_dir)
     res = []
     url = "https://civitai.com/api/v1/models/" + str(modelid)
-    req_count=0
-    req_max_count=5
+    req_count = 0
+
     while True:
         try:
-            req_count+=1
+            req_count += 1
             response = requests.get(url)
             break
         except requests.exceptions.RequestException as e:
@@ -139,47 +147,43 @@ def download_detail(modelid, types):
             continue
     if response.status_code == 200:
         model = response.json()
-        if "/" in model["name"]:
-            model["name"] = model["name"].replace("/", "-")
-        if "\\" in model["name"]:
-            model["name"] = model["name"].replace("\\", "-")
-        if " " in model["name"]:
-            model["name"] = model["name"].replace(" ", "-")
-        if "|" in model["name"]:
-            model["name"] = model["name"].replace("|", "-")
+        model["name"] = format_name(model["name"])
+        res_model_download_url = model["modelVersions"][0]["downloadUrl"]
+        save_model_path = os.path.join(save_dir, model["name"])
 
-        res_download_url = model["modelVersions"][0]["downloadUrl"]
-
-        if not os.path.exists((save_dir + "\\{}").format(model["name"])):
-            os.makedirs((save_dir + "\\{}").format(model["name"]))
-        res_save_path = (save_dir + "\\{}").format(model["name"])
+        if not os.path.exists(save_model_path):
+            os.makedirs(save_model_path)
         # Save the model_tag to a file
-        with open(
-            (save_dir + "\\{}\\{}.txt").format(model["name"], model["name"]), "w"
-        ) as f:
-            f.write("id:" + str(model["id"]) + "\n")
+        with open((save_model_path + "\\info.txt"), "w") as f:
+            f.write("model_id:" + str(model["id"]) + "\n")
+            f.write(
+                "lastest model_ver_id:"
+                + str(model["modelVersions"][0]["modelId"])
+                + "\n"
+            )
+            f.write("base model:" + model["modelVersions"][0]["baseModel"] + "\n")
             f.write("name:" + model["name"] + "\n")
+            f.write("tags:")
             for tag in model["tags"]:
                 f.write(tag + ",")
-            print("write model {} tag".format(model["name"]))
         count = 0
         futures = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             for image in model["modelVersions"][0]["images"]:
-                count += 1
                 res.append(
                     (
-                        (save_dir + "\\{}\\{}.jpg").format(model["name"], count),
-                        (save_dir + "\\{}\\{}.jpg").format(model["name"], count),
+                        (save_model_path + "\\{}.jpg").format(count),
+                        str(count),
                     )
                 )
                 future = executor.submit(
-                    download_tag_images, res_save_path, count, image
+                    download_images_and_prompts, save_model_path, count, image
                 )
+                count += 1
                 futures.append(future)
         concurrent.futures.wait(futures)
 
-    return res, res_save_path, res_download_url
+    return res, res_model_download_url, save_model_path
 
 
 def tags_get(query, page, per_page_count):

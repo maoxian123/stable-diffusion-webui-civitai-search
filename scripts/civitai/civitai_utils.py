@@ -4,7 +4,7 @@ import time
 import concurrent.futures
 
 
-def download_images(download_url, types, save_dir, save_name):
+def download_images(download_url, save_name):
     while True:
         try:
             response = requests.get(download_url)
@@ -15,9 +15,8 @@ def download_images(download_url, types, save_dir, save_name):
 
     if response.status_code == 200:
         # Save the image to a file
-        with open("{}/{}.jpg".format(save_dir, save_name), "wb") as f:
+        with open(save_name, "wb") as f:
             f.write(response.content)
-            print("type:{} Downloaded image {}".format(types, save_name))
     return None
 
 
@@ -48,7 +47,7 @@ def process_meta(meta):
     return res
 
 
-def download_tag_images(save_dir, save_name, image: dict):
+def download_images_and_prompts(save_dir, save_name, image: dict):
     download_url = image["url"]
     while True:
         try:
@@ -103,3 +102,21 @@ def get_all_downloaded_dirs(typedir):
     dirs = [os.path.join(typedir, d) for d in dirs]
     return dirs
     
+def format_name(name):
+    if "/" in name:
+        name = name.replace("/", "-")
+    if "\\" in name:
+        name = name.replace("\\", "-")
+    if " " in name:
+        name = name.replace(" ", "-")
+    if "|" in name:
+        name = name.replace("|", "-")
+    if "'" in name:
+        name = name.replace("'", "-")
+    if "\"" in name:
+        name = name.replace("\"", "-")
+    if "*" in name:
+        name = name.replace("*", "-")
+    if name[len(name) - 1] == "-":
+        name = name[: len(name) - 1]
+    return name
