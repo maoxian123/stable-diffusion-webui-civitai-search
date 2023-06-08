@@ -23,8 +23,8 @@ def download_images(download_url, save_name):
 def process_meta(meta):
     # Size: 540x768, Seed: 2972238300, Model: NeverEndingDream_2.2_BakedVae_fp16, Steps: 30, Sampler: DPM++ SDE Karras, CFG scale: 7, Clip skip: 2, Model hash: ecefb796ff, Hires steps: 40, Hires upscale: 1.8, Hires upscaler: Lanczos, Denoising strength: 0.3
     res = ""
-    res += meta["prompt"] + "\n"
-    res += "Negative prompt: " + meta["negativePrompt"] + "\n"
+    res += meta["prompt"] + "\r\n"
+    res += "Negative prompt: " + meta["negativePrompt"] + "\r\n"
     for key, value in meta.items():
         if (
             key == "prompt"
@@ -64,10 +64,12 @@ def download_images_and_prompts(save_dir, save_name, image: dict):
             f.write(process_meta(image["meta"]))
 
 
-def load_all_image_local(dir,cache=False):
+def load_all_image_local(dir, cache=False):
     files = os.listdir(dir)
-    #only image
-    files = [f for f in files if os.path.isfile(os.path.join(dir, f)) and f.endswith(".jpg")]
+    # only image
+    files = [
+        f for f in files if os.path.isfile(os.path.join(dir, f)) and f.endswith(".jpg")
+    ]
     files.sort(key=lambda x: os.path.getctime(os.path.join(dir, x)))
     images = []
     if cache:
@@ -75,7 +77,7 @@ def load_all_image_local(dir,cache=False):
             images.append((os.path.join(dir, file), file.split(".jpg")[0]))
     else:
         for file in files:
-            images.append((os.path.join(dir, file), os.path.join(dir, file)))
+            images.append((os.path.join(dir, file), file.split(".jpg")[0]))
     return images
 
 
@@ -83,7 +85,7 @@ def load_image_prompts(imagepath):
     txt_path = imagepath.split(".jpg")[0] + ".txt"
     if not os.path.exists(txt_path):
         return None
-    
+
     with open(txt_path, "r") as f:
         # read all
         lines = f.readlines()
@@ -93,15 +95,6 @@ def load_image_prompts(imagepath):
     return res
 
 
-def get_all_downloaded_dirs(typedir):
-    dirs = os.listdir(typedir)
-    
-    dirs = [d for d in dirs if os.path.isdir(os.path.join(typedir, d))]
-    dirs.sort(key=lambda x: os.path.getctime(os.path.join(typedir, x)))
-    #add typedir
-    dirs = [os.path.join(typedir, d) for d in dirs]
-    return dirs
-    
 def format_name(name):
     if "/" in name:
         name = name.replace("/", "-")
@@ -113,10 +106,12 @@ def format_name(name):
         name = name.replace("|", "-")
     if "'" in name:
         name = name.replace("'", "-")
-    if "\"" in name:
-        name = name.replace("\"", "-")
+    if '"' in name:
+        name = name.replace('"', "-")
     if "*" in name:
         name = name.replace("*", "-")
+    if "?" in name:
+        name = name.replace("?", "-")
     if name[len(name) - 1] == "-":
         name = name[: len(name) - 1]
     return name

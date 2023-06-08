@@ -9,7 +9,6 @@ from scripts.civitai.civitai import (
 from scripts.civitai.civitai_utils import (
     load_all_image_local,
     load_image_prompts,
-    get_all_downloaded_dirs,
 )
 from pathlib import Path
 import os
@@ -47,7 +46,7 @@ def download_detail_fn(types):
 
 def view_selected_detail(evt: gr.SelectData, types):
     # print(f"You selected {evt.value} at {evt.index} from {evt.target}")
-    #print(evt.index)
+    # print(evt.index)
     global preview_select_model_id
     preview_select_model_id = pre_model_ids[int(evt.index)]
     return None
@@ -57,7 +56,8 @@ def view_selected_prompts(evt: gr.SelectData):
     # print(evt.index)
     # print(evt.value)
     # mage_path=cur_select_detail_model_path+f"\\{evt.value}.jpg"
-    return load_image_prompts(evt.value)
+    print(cur_select_detail_model_path + f"\\{evt.value}.jpg")
+    return load_image_prompts(cur_select_detail_model_path + f"\\{evt.value}.jpg")
 
 
 ROOT_DIR = Path().absolute()
@@ -85,13 +85,15 @@ def get_all_download_model(type):
     if type == "Checkpoint":
         typedir = real_path_model
     # print(typedir)
-    dirs = get_all_downloaded_dirs(typedir)
+    dirs = dirs = os.listdir(typedir)
+    dirs = [d for d in dirs if os.path.isdir(os.path.join(typedir, d))]
+    dirs.sort(key=lambda x: os.path.getctime(os.path.join(typedir, x)))
     res = []
     if dirs == None:
         return None
     for dir in dirs:
-        if os.path.exists(dir + "\\0.jpg"):
-            res.append((dir + "\\0.jpg", dir))
+        if os.path.exists(os.path.join(typedir, dir, "0.jpg")):
+            res.append((os.path.join(typedir, dir, "0.jpg"), dir))
     return res
 
 
@@ -103,9 +105,12 @@ def load_all_image_localcache_fn(types):
     return load_all_image_local(dir, True)
 
 
-def select_local_detail_fn(evt: gr.SelectData):
+def select_local_detail_fn(evt: gr.SelectData, type):
     global cur_select_detail_model_path
-    cur_select_detail_model_path = evt.value
+    if type == "LORA":
+        cur_select_detail_model_path = os.path.join(real_path_lora, evt.value)
+    if type == "Checkpoint":
+        cur_select_detail_model_path = os.path.join(real_path_model, evt.value)
     with open(cur_select_detail_model_path + "\\info.txt", "r") as f:
         info = f.readlines()
     for line in info:
@@ -118,7 +123,7 @@ def select_local_detail_fn(evt: gr.SelectData):
 
 
 def clear_cache_preview():
-    #delete the lora and checkpoint floder
+    # delete the lora and checkpoint floder
     shutil.rmtree(current_ext_dir + "\\LORA")
     shutil.rmtree(current_ext_dir + "\\Checkpoint")
 
@@ -208,12 +213,12 @@ def on_ui_tabs():
             with gr.Row():
                 select_model_name = gr.inputs.Textbox(label="选中的模型名")
                 select_model_base_model = gr.inputs.Textbox(label="模型底模")
-            with gr.Row(elem_id="local_prompts"):
-                local_image_prompts = gr.inputs.Textbox(label="image prompts")
             local_send_t2i = gr.Button(value="发送到文生图")
             gallery3 = gr.Gallery(
                 label="模型列表", show_label=True, elem_id="gallery3"
             ).style(columns=[5], object_fit="contain", height="auto")
+            with gr.Row(elem_id="local_prompts"):
+                local_image_prompts = gr.inputs.Textbox(label="image prompts")
             gallery4 = gr.Gallery(
                 label="对应的具体信息", show_label=True, elem_id="gallery4"
             ).style(columns=[5], object_fit="contain", height="auto")
@@ -229,6 +234,7 @@ def on_ui_tabs():
         )
         gallery3.select(
             fn=select_local_detail_fn,
+            inputs=local_type_dropdown,
             outputs=[gallery4, select_model_name, select_model_base_model],
         )
         gallery4.select(fn=view_selected_prompts, outputs=[local_image_prompts])
