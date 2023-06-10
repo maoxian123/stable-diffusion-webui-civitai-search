@@ -1,14 +1,16 @@
 import gradio as gr
-import requests
 from scripts.civitai.civitai import (
     download_models_pre,
     download_detail,
     tags_get,
+    search_img,
     current_ext_dir,
+    search_img_save_dir,
 )
 from scripts.civitai.civitai_utils import (
     load_all_image_local,
     load_image_prompts,
+    load_image_resources,
 )
 from pathlib import Path
 import os
@@ -56,7 +58,7 @@ def view_selected_prompts(evt: gr.SelectData):
     # print(evt.index)
     # print(evt.value)
     # mage_path=cur_select_detail_model_path+f"\\{evt.value}.jpg"
-    print(cur_select_detail_model_path + f"\\{evt.value}.jpg")
+    # print(cur_select_detail_model_path + f"\\{evt.value}.jpg")
     return load_image_prompts(cur_select_detail_model_path + f"\\{evt.value}.jpg")
 
 
@@ -128,6 +130,42 @@ def clear_cache_preview():
     shutil.rmtree(current_ext_dir + "\\Checkpoint")
 
 
+class search_image:
+    __page_num = 1
+
+    @staticmethod
+    def search_img_fn(nsfw, sort, page_num, per_page_num):
+        if page_num <= 0:
+            return None
+        search_image.__page_num = page_num
+        res = search_img(nsfw, sort, page_num, per_page_num)
+        return res
+
+    @staticmethod
+    def search_img_next_fn(nsfw, sort, per_page_num):
+        search_image.__page_num += 1
+        res = search_img(nsfw, sort, search_image.__page_num, per_page_num)
+        return res, search_image.__page_num
+
+    @staticmethod
+    def search_img_pre_fn(nsfw, sort, per_page_num):
+        if search_image.__page_num <= 1:
+            return None
+        search_image.__page_num -= 1
+        res = search_img(nsfw, sort, search_image.__page_num, per_page_num)
+        return res, search_image.__page_num
+
+    @staticmethod
+    def search_img_view_detail(evt: gr.SelectData):
+        return load_image_prompts(
+            search_img_save_dir + f"\\{evt.value}.jpg"
+        ), load_image_resources(search_img_save_dir + f"\\{evt.value}.jpg")
+
+    @staticmethod
+    def clear_search_img_cache():
+        shutil.rmtree(search_img_save_dir)
+
+
 def on_ui_tabs():
     with gr.Blocks() as grapp:
         with gr.Tab("model、lora 预览", elem_id="civitai_preview"):
@@ -156,7 +194,7 @@ def on_ui_tabs():
                 load_cache_btn = gr.Button(value="加载已缓存的")
                 clear_cache_btn = gr.Button(value="清理缓存")
 
-            gallery = gr.Gallery(label="预览", show_label=True, elem_id="gallery1").style(
+            gallery = gr.Gallery(label="模型预览", show_label=True, elem_id="gallery1").style(
                 columns=[5], object_fit="contain", height="auto"
             )
             with gr.Row():
@@ -164,9 +202,9 @@ def on_ui_tabs():
                 download_select_btn = gr.Button(value="下载选中的")
             with gr.Row(elem_id="detail_prompts"):
                 image_prompts = gr.inputs.Textbox(label="image prompts")
-            detail_send_t2i = gr.Button(value="发送到文生图")
+                detail_send_t2i = gr.Button(value="发送到文生图")
             detail_gallery = gr.Gallery(
-                label="具体信息", show_label=True, elem_id="detail_gallery"
+                label="选中模型的子图", show_label=True, elem_id="detail_gallery"
             ).style(columns=[5], object_fit="contain", height="auto")
         clear_cache_btn.click(clear_cache_preview)
         search_btn.click(
@@ -213,21 +251,86 @@ def on_ui_tabs():
             with gr.Row():
                 select_model_name = gr.inputs.Textbox(label="选中的模型名")
                 select_model_base_model = gr.inputs.Textbox(label="模型底模")
-            local_send_t2i = gr.Button(value="发送到文生图")
+
             gallery3 = gr.Gallery(
                 label="模型列表", show_label=True, elem_id="gallery3"
             ).style(columns=[5], object_fit="contain", height="auto")
             with gr.Row(elem_id="local_prompts"):
                 local_image_prompts = gr.inputs.Textbox(label="image prompts")
+                local_send_t2i = gr.Button(value="发送到文生图")
             gallery4 = gr.Gallery(
-                label="对应的具体信息", show_label=True, elem_id="gallery4"
+                label="选中模型的子图", show_label=True, elem_id="gallery4"
             ).style(columns=[5], object_fit="contain", height="auto")
 
+        with gr.Tab("搜索图片"):
+            with gr.Row():
+                image_sort_dropdown = gr.inputs.Dropdown(
+                    label="排序选择",
+                    choices=["Most Reactions", "Most Comments", "Newest"],
+                    default="Newest",
+                )
+                image_nsfw_dropdown = gr.inputs.Dropdown(
+                    label="nsfw选择",
+                    choices=["all", "nsfw=true", "nsfw=false", "Soft", "Mature", "X"],
+                    default="all",
+                )
+            with gr.Row():
+                image_page_num = gr.Number(label="页数", value=1,precision=0)
+                image_per_page_num = gr.Number(label="每页数量", value=20,precision=0)
+            with gr.Row():
+                image_search_button = gr.Button(value="搜索")
+                image_search_prev_page_button = gr.Button(value="上一页")
+                image_search_next_page_button = gr.Button(value="下一页")
+
+            image_clear_cache_btn = gr.Button(value="清理缓存")
+            with gr.Row(elem_id="search_prompts"):
+                search_image_prompts = gr.inputs.Textbox(label="image prompts")
+                search_image_resources = gr.inputs.Textbox(label="用到的模型和lora等资源")
+            with gr.Row():
+                search_image_send_t2i = gr.Button(value="发送到文生图")
+            with gr.Row():
+                image_gallery = gr.Gallery(
+                    label="图片", show_label=True, elem_id="search_img_gallery"
+                ).style(columns=[5], object_fit="contain", height="auto")
+            image_search_button.click(
+                fn=search_image.search_img_fn,
+                inputs=[
+                    image_nsfw_dropdown,
+                    image_sort_dropdown,
+                    image_page_num,
+                    image_per_page_num,
+                ],
+                outputs=image_gallery,
+            )
+            image_search_prev_page_button.click(
+                fn=search_image.search_img_pre_fn,
+                inputs=[
+                    image_nsfw_dropdown,
+                    image_sort_dropdown,
+                    image_per_page_num,
+                ],
+                outputs=[image_gallery, image_page_num],
+            )
+            image_search_next_page_button.click(
+                fn=search_image.search_img_next_fn,
+                inputs=[
+                    image_nsfw_dropdown,
+                    image_sort_dropdown,
+                    image_per_page_num,
+                ],
+                outputs=[image_gallery, image_page_num],
+            )
+
+        image_gallery.select(
+            fn=search_image.search_img_view_detail,
+            outputs=[search_image_prompts, search_image_resources],
+        )
         tag_search_button.click(
             fn=tag_search_fn,
             inputs=[tag_input, tag_page_num, tag_per_page_num],
             outputs=res_text,
         )
+        image_clear_cache_btn.click(search_image.clear_search_img_cache)
 
         button_load_local.click(
             fn=get_all_download_model, inputs=[local_type_dropdown], outputs=gallery3
@@ -239,11 +342,13 @@ def on_ui_tabs():
         )
         gallery4.select(fn=view_selected_prompts, outputs=[local_image_prompts])
 
-        detail_send_t2i.click(fn=None, _js=f"detail_text_send_t2i")
-        local_send_t2i.click(fn=None, _js=f"local_text_send_t2i")
-
         detail_send_t2i.click(fn=None, _js=f"switch_to_txt2img")
         local_send_t2i.click(fn=None, _js=f"switch_to_txt2img")
+        search_image_send_t2i.click(fn=None, _js=f"switch_to_txt2img")
+
+        detail_send_t2i.click(fn=None, _js=f"detail_text_send_t2i")
+        local_send_t2i.click(fn=None, _js=f"local_text_send_t2i")
+        search_image_send_t2i.click(fn=None, _js=f"search_text_send_t2i")
 
         return [(grapp, "Civitai Search", "civitai search")]
 

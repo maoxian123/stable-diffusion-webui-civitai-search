@@ -2,12 +2,17 @@ import requests
 import os
 import time
 import concurrent.futures
-from .civitai_utils import download_images, download_images_and_prompts, format_name
+from .civitai_utils import (
+    download_images,
+    download_images_and_prompts,
+    format_name,
+    my_request_get,
+)
 
 current_ext_dir = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
-req_max_count = 5
+search_img_save_dir = os.path.join(current_ext_dir, "search_img")
 
 
 def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
@@ -15,7 +20,7 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
     download_urls = []
     save_names = []
     res = []
-    model_ids=[]
+    model_ids = []
     url = "https://civitai.com/api/v1/models"
     futures = []
     # porn nsfw sex sexy nude naked
@@ -56,18 +61,9 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
-    req_count = 0
-    while True:
-        try:
-            req_count += 1
-            response = requests.get(url, params=query_params, timeout=5)
-            break
-        except requests.exceptions.RequestException as e:
-            if req_count >= req_max_count:
-                print("req>5 check your network")
-                return res
-            time.sleep(1)
-            continue
+    response = my_request_get(url, params=query_params)
+    if response == None:
+        return [(None, "get img error,please retry")]
 
     if response.status_code == 200:
         models = response.json()
@@ -94,7 +90,7 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
                     dir_name, item["name"] + "-" + str(item["id"])
                 )
                 if os.path.exists(image_save_name):
-                    #already downloaded
+                    # already downloaded
                     res.append((image_save_name, item["name"]))
                     model_ids.append(item["id"])
                     continue
@@ -119,7 +115,7 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
             future = executor.submit(download_images, url, save_names[i])
             futures.append(future)
     concurrent.futures.wait(futures)
-    return res,model_ids
+    return res, model_ids
 
 
 def download_detail(modelid, types):
@@ -132,19 +128,11 @@ def download_detail(modelid, types):
     print(save_dir)
     res = []
     url = "https://civitai.com/api/v1/models/" + str(modelid)
-    req_count = 0
 
-    while True:
-        try:
-            req_count += 1
-            response = requests.get(url)
-            break
-        except requests.exceptions.RequestException as e:
-            if req_count >= req_max_count:
-                print("req>5 check your network")
-                return res
-            time.sleep(1)
-            continue
+    response = my_request_get(url)
+    if response == None:
+        return [(None, "get img error,please retry")]
+
     if response.status_code == 200:
         model = response.json()
         model["name"] = format_name(model["name"])
@@ -193,13 +181,10 @@ def tags_get(query, page, per_page_count):
         params = {"limit": per_page_count, "page": page}
     else:
         params = {"limit": per_page_count, "page": page, "query": query}
-    while True:
-        try:
-            response = requests.get(url, params=params)
-            break
-        except requests.exceptions.RequestException as e:
-            time.sleep(1)
-            continue
+
+    response = my_request_get(url, params=params)
+    if response == None:
+        return res
     if response.status_code == 200:
         tags = response.json()["items"]
         for tag in tags:
@@ -207,7 +192,61 @@ def tags_get(query, page, per_page_count):
     return res
 
 
-# # main
-# if __name__ == "__main__":
-#     res = download_models_pre(None, "LORA", None, "Newest", 4, 50)
-#     print(res)
+def search_img(nsfw, sort, page_num, per_page_num):
+    if not os.path.exists(search_img_save_dir):
+        os.makedirs(search_img_save_dir)
+    url = "https://civitai.com/api/v1/images"
+    res = []
+    query_params = {
+        "limit": per_page_num,
+        "page": page_num,
+        "sort": sort,  # Most Reactions, Most Comments, Newest
+        "period": "AllTime",
+        "nsfw": "true",
+    }
+    # choices=["all", "nsfw=true", "nsfw=false", "Soft", "Mature", "X"],
+    if nsfw == "nsfw=all":
+        del query_params["nsfw"]
+    elif nsfw == "nsfw=false":
+        query_params["nsfw"] = "None"
+    elif nsfw == "nsfw=true":
+        query_params["nsfw"] = "true"
+    elif nsfw == "Soft":
+        query_params["nsfw"] = "Soft"
+    elif nsfw == "Mature":
+        query_params["nsfw"] = "Mature"
+    elif nsfw == "X":
+        query_params["nsfw"] = "X"
+        
+    print(query_params)
+
+    response = my_request_get(url, params=query_params)
+    if response == None:
+        return [(None, "get img error,please retry")]
+    if response.status_code == 200:
+        items = response.json()["items"]
+        futures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            for item in items:
+                try:
+                    image_save_name = "{}/{}.jpg".format(
+                        search_img_save_dir, str(item["id"])
+                    )
+                    if os.path.exists(image_save_name):
+                        # already downloaded
+                        res.append((image_save_name, item["id"]))
+                        continue
+                    res.append((image_save_name, item["id"]))
+                    future = executor.submit(
+                        download_images_and_prompts,
+                        search_img_save_dir,
+                        item["id"],
+                        item,
+                        True,
+                    )
+                    futures.append(future)
+                except KeyError:
+                    print("Error: item does not have the expected property")
+                    continue
+        concurrent.futures.wait(futures)
+    return res

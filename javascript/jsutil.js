@@ -25,16 +25,36 @@ function switch_to_civitai_local_view() {
 }
 
 function detail_text_send_t2i() {
-    gradioApp().getElementById('txt2img_prompt').querySelectorAll('textarea')[0].value = gradioApp().getElementById('detail_prompts').querySelectorAll('textarea')[0].value;
+    let textarea = gradioApp().getElementById('txt2img_prompt').querySelectorAll('textarea')[0];
+    textarea.value = gradioApp().getElementById('detail_prompts').querySelectorAll('textarea')[0].value;
+    // 手动触发事件
+    let inputEvent = new Event('input')
+    textarea.dispatchEvent(inputEvent)
+
+    let changeEvent = new Event('change')
+    textarea.dispatchEvent(changeEvent)
     return args_to_array(arguments);
 }
 
 function local_text_send_t2i() {
-    gradioApp().getElementById('txt2img_prompt').querySelectorAll('textarea')[0].value = gradioApp().getElementById('local_prompts').querySelectorAll('textarea')[0].value;
+    let textarea = gradioApp().getElementById('txt2img_prompt').querySelectorAll('textarea')[0];
+    textarea.value = gradioApp().getElementById('local_prompts').querySelectorAll('textarea')[0].value;
+    // 手动触发事件
+    let inputEvent = new Event('input')
+    textarea.dispatchEvent(inputEvent)
+
+    let changeEvent = new Event('change')
+    textarea.dispatchEvent(changeEvent)
     return args_to_array(arguments);
 }
+function search_text_send_t2i() {
+    let textarea = gradioApp().getElementById('txt2img_prompt').querySelectorAll('textarea')[0];
+    textarea.value = gradioApp().getElementById('search_prompts').querySelectorAll('textarea')[0].value;
+    // 手动触发事件
+    let inputEvent = new Event('input')
+    textarea.dispatchEvent(inputEvent)
 
-function send_test() {
-    gradioApp().getElementById('txt2img_prompt').querySelectorAll('textarea')[0].value = '123';
+    let changeEvent = new Event('change')
+    textarea.dispatchEvent(changeEvent)
     return args_to_array(arguments);
 }
