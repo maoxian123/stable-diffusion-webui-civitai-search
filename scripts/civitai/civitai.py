@@ -15,7 +15,9 @@ current_ext_dir = os.path.dirname(
 search_img_save_dir = os.path.join(current_ext_dir, "search_img")
 
 
-def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
+def download_models_pre(
+    name, tag, types, nsfw, sort, page_num, per_page_num, sort_period
+):
     allcount = 0
     download_urls = []
     save_names = []
@@ -31,7 +33,7 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
         "query": "name",
         "types": "Checkpoint",
         "sort": sort,  # Newest Most Downloaded Highest Rated
-        "period": "AllTime",
+        "period": sort_period,
         "nsfw": "true",
     }
     if name:
@@ -70,7 +72,7 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
         # Do something with the models
         print("this page num:{}".format(len(models["items"])))
         if len(models["items"]) == 0:
-            return res
+            return res, model_ids
         for item in models["items"]:
             try:
                 if nsfw == "nsfw=true":
@@ -85,8 +87,10 @@ def download_models_pre(name, tag, types, nsfw, sort, page_num, per_page_num):
                         allcount += 1
                 else:
                     allcount += 1
+
                 item["name"] = format_name(item["name"])
-                image_save_name = "{}/{}.jpg".format(
+                print(item["name"])
+                image_save_name = "{}\\{}.jpg".format(
                     dir_name, item["name"] + "-" + str(item["id"])
                 )
                 if os.path.exists(image_save_name):
@@ -192,7 +196,7 @@ def tags_get(query, page, per_page_count):
     return res
 
 
-def search_img(nsfw, sort, page_num, per_page_num):
+def search_img(nsfw, sort, page_num, per_page_num, sort_period):
     if not os.path.exists(search_img_save_dir):
         os.makedirs(search_img_save_dir)
     url = "https://civitai.com/api/v1/images"
@@ -201,7 +205,7 @@ def search_img(nsfw, sort, page_num, per_page_num):
         "limit": per_page_num,
         "page": page_num,
         "sort": sort,  # Most Reactions, Most Comments, Newest
-        "period": "AllTime",
+        "period": sort_period,
         "nsfw": "true",
     }
     # choices=["all", "nsfw=true", "nsfw=false", "Soft", "Mature", "X"],
@@ -217,7 +221,7 @@ def search_img(nsfw, sort, page_num, per_page_num):
         query_params["nsfw"] = "Mature"
     elif nsfw == "X":
         query_params["nsfw"] = "X"
-        
+
     print(query_params)
 
     response = my_request_get(url, params=query_params)

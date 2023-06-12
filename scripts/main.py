@@ -24,7 +24,9 @@ cur_select_detail_model_path = ""
 pre_model_ids = []
 
 
-def download_models_pre_fn(name, tag, types, nsfw, sort, page_num, per_page_num):
+def download_models_pre_fn(
+    name, tag, types, nsfw, sort, page_num, per_page_num, sort_period
+):
     global pre_model_ids
     if name == None or name == "":
         name = None
@@ -33,7 +35,7 @@ def download_models_pre_fn(name, tag, types, nsfw, sort, page_num, per_page_num)
     if types == None or types == "":
         types = "Checkpoint"
     res, pre_model_ids = download_models_pre(
-        name, tag, types, nsfw, sort, int(page_num), int(per_page_num)
+        name, tag, types, nsfw, sort, int(page_num), int(per_page_num), sort_period
     )
     return res
 
@@ -134,25 +136,25 @@ class search_image:
     __page_num = 1
 
     @staticmethod
-    def search_img_fn(nsfw, sort, page_num, per_page_num):
+    def search_img_fn(nsfw, sort, page_num, per_page_num, sort_period):
         if page_num <= 0:
             return None
         search_image.__page_num = page_num
-        res = search_img(nsfw, sort, page_num, per_page_num)
+        res = search_img(nsfw, sort, page_num, per_page_num, sort_period)
         return res
 
     @staticmethod
-    def search_img_next_fn(nsfw, sort, per_page_num):
+    def search_img_next_fn(nsfw, sort, per_page_num, sort_period):
         search_image.__page_num += 1
-        res = search_img(nsfw, sort, search_image.__page_num, per_page_num)
+        res = search_img(nsfw, sort, search_image.__page_num, per_page_num, sort_period)
         return res, search_image.__page_num
 
     @staticmethod
-    def search_img_pre_fn(nsfw, sort, per_page_num):
+    def search_img_pre_fn(nsfw, sort, per_page_num, sort_period):
         if search_image.__page_num <= 1:
             return None
         search_image.__page_num -= 1
-        res = search_img(nsfw, sort, search_image.__page_num, per_page_num)
+        res = search_img(nsfw, sort, search_image.__page_num, per_page_num, sort_period)
         return res, search_image.__page_num
 
     @staticmethod
@@ -171,32 +173,40 @@ def on_ui_tabs():
         with gr.Tab("model、lora 预览", elem_id="civitai_preview"):
             name_input_text = gr.inputs.Textbox(label="根据name搜索")
             tag_input_text = gr.inputs.Textbox(label="根据tag搜索")
-            with gr.Row():
-                type_dropdown = gr.inputs.Dropdown(
-                    label="类型选择", choices=["Checkpoint", "LORA"], default="Checkpoint"
-                )
-                sort_dropdown = gr.inputs.Dropdown(
-                    label="排序选择",
-                    choices=["Newest", "Most Downloaded", "Highest Rated"],
-                    default="Most Downloaded",
-                )
-                nsfw_dropdown = gr.inputs.Dropdown(
-                    label="nsfw选择",
-                    choices=["all", "nsfw=true", "nsfw=false"],
-                    default="all",
-                )
+            with gr.Accordion("搜索选项", open=False):
+                with gr.Row():
+                    preview_type_radio = gr.Radio(
+                        label="类型选择", choices=["Checkpoint", "LORA"], value="Checkpoint"
+                    )
+                    with gr.Column():
+                        preview_sort_radio = gr.Radio(
+                            label="排序选择",
+                            choices=["Newest", "Most Downloaded", "Highest Rated"],
+                            value="Most Downloaded",
+                        )
+                        preview_sort_period = gr.Radio(
+                            ["AllTime", "Year", "Month", "Week", "Day"],
+                            label="排序时间",
+                            value="Day",
+                        )
+
+                    preview_nsfw_radio = gr.Radio(
+                        label="nsfw选择",
+                        choices=["all", "nsfw=true", "nsfw=false"],
+                        value="all",
+                    )
 
             with gr.Row():
-                page_num = gr.inputs.Number(label="页数", default=1)
-                per_page_num = gr.inputs.Number(label="每页数量", default=20)
+                page_num = gr.Number(label="页数", value=1, precision=0)
+                per_page_num = gr.Number(label="每页数量", value=10, precision=0)
             search_btn = gr.Button(value="搜索")
             with gr.Row():
                 load_cache_btn = gr.Button(value="加载已缓存的")
                 clear_cache_btn = gr.Button(value="清理缓存")
 
-            gallery = gr.Gallery(label="模型预览", show_label=True, elem_id="gallery1").style(
-                columns=[5], object_fit="contain", height="auto"
-            )
+            gallery = gr.Gallery(
+                label="模型预览", show_label=True, elem_id="gallery1"
+            ).style(columns=[5], object_fit="contain", height="auto")
             with gr.Row():
                 preview_btn = gr.Button(value="查看选中的")
                 download_select_btn = gr.Button(value="下载选中的")
@@ -212,33 +222,36 @@ def on_ui_tabs():
             inputs=[
                 name_input_text,
                 tag_input_text,
-                type_dropdown,
-                nsfw_dropdown,
-                sort_dropdown,
+                preview_type_radio,
+                preview_nsfw_radio,
+                preview_sort_radio,
                 page_num,
                 per_page_num,
+                preview_sort_period,
             ],
             outputs=gallery,
         )
         load_cache_btn.click(
-            fn=load_all_image_localcache_fn, inputs=[type_dropdown], outputs=gallery
+            fn=load_all_image_localcache_fn,
+            inputs=[preview_type_radio],
+            outputs=gallery,
         )
         gallery.select(
             fn=view_selected_detail,
         )
         preview_btn.click(
             fn=download_detail_fn,
-            inputs=[type_dropdown],
+            inputs=[preview_type_radio],
             outputs=[detail_gallery],
         )
-        download_select_btn.click(download_save_model_fn, inputs=[type_dropdown])
+        download_select_btn.click(download_save_model_fn, inputs=[preview_type_radio])
         detail_gallery.select(fn=view_selected_prompts, outputs=[image_prompts])
 
         with gr.Tab("tags搜索") as tab3:
             tag_input = gr.inputs.Textbox(label="Enter a search tag or null for all")
             with gr.Row():
-                tag_page_num = gr.inputs.Number(label="页数", default=1)
-                tag_per_page_num = gr.inputs.Number(label="每页数量", default=20)
+                tag_page_num = gr.Number(label="页数", value=1, precision=0)
+                tag_per_page_num = gr.Number(label="每页数量", value=10, precision=0)
             tag_search_button = gr.Button(value="搜索")
             res_text = gr.outputs.Textbox(label="搜索结果")
 
@@ -263,20 +276,27 @@ def on_ui_tabs():
             ).style(columns=[5], object_fit="contain", height="auto")
 
         with gr.Tab("搜索图片"):
+            with gr.Accordion("搜索选项", open=False):
+                with gr.Row():
+                    with gr.Column():
+                        image_sort = gr.Radio(
+                            ["Most Reactions", "Most Comments", "Newest"],
+                            label="排序选择",
+                            value="Most Reactions",
+                        )
+                        image_sort_period = gr.Radio(
+                            ["AllTime", "Year", "Month", "Week", "Day"],
+                            label="排序时间",
+                            value="Day",
+                        )
+                    image_nsfw = gr.Radio(
+                        ["all", "nsfw=true", "nsfw=false", "Soft", "Mature", "X"],
+                        label="nsfw选择",
+                        value="all",
+                    )
             with gr.Row():
-                image_sort_dropdown = gr.inputs.Dropdown(
-                    label="排序选择",
-                    choices=["Most Reactions", "Most Comments", "Newest"],
-                    default="Newest",
-                )
-                image_nsfw_dropdown = gr.inputs.Dropdown(
-                    label="nsfw选择",
-                    choices=["all", "nsfw=true", "nsfw=false", "Soft", "Mature", "X"],
-                    default="all",
-                )
-            with gr.Row():
-                image_page_num = gr.Number(label="页数", value=1,precision=0)
-                image_per_page_num = gr.Number(label="每页数量", value=20,precision=0)
+                image_page_num = gr.Number(label="页数", precision=0, value=1)
+                image_per_page_num = gr.Number(label="每页数量", precision=0, value=10)
             with gr.Row():
                 image_search_button = gr.Button(value="搜索")
                 image_search_prev_page_button = gr.Button(value="上一页")
@@ -295,28 +315,31 @@ def on_ui_tabs():
             image_search_button.click(
                 fn=search_image.search_img_fn,
                 inputs=[
-                    image_nsfw_dropdown,
-                    image_sort_dropdown,
+                    image_nsfw,
+                    image_sort,
                     image_page_num,
                     image_per_page_num,
+                    image_sort_period,
                 ],
                 outputs=image_gallery,
             )
             image_search_prev_page_button.click(
                 fn=search_image.search_img_pre_fn,
                 inputs=[
-                    image_nsfw_dropdown,
-                    image_sort_dropdown,
+                    image_nsfw,
+                    image_sort,
                     image_per_page_num,
+                    image_sort_period,
                 ],
                 outputs=[image_gallery, image_page_num],
             )
             image_search_next_page_button.click(
                 fn=search_image.search_img_next_fn,
                 inputs=[
-                    image_nsfw_dropdown,
-                    image_sort_dropdown,
+                    image_nsfw,
+                    image_sort,
                     image_per_page_num,
+                    image_sort_period,
                 ],
                 outputs=[image_gallery, image_page_num],
             )

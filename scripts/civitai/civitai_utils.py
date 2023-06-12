@@ -5,7 +5,8 @@ import concurrent.futures
 import json
 import random
 import requests
-
+from modules.images import read_info_from_image
+from PIL import Image
 agents = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0",
     "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1",
@@ -16,29 +17,38 @@ agents = [
 ]
 refers = [
     "https://www.google.com/",
-    "https://www.yahoo.com/",
+    "https://github.com/civitai/civitai/wiki/REST-API-Reference",
+    "https://gradio.app",
+    "https://cloud.tencent.com",
+    "https://www.qiniu.com/qfans"
 ]
 
 
-def gen_random_headers():
-    headers = {
-        #"Host": "civitai.com",
-        # "If-None-Match": 'W/"wa4wt4hdb0uagx"',
+def gen_random_headers(req_img=False):
+    if req_img:
+        headers = {
+        "Host": "image.civitai.com",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36",
         "Referer": "https://www.example.com/",
     }
+    else:
+        headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:40.0) Gecko/20100101 Firefox/40.1",
+        "Referer": "https://www.example.com/",
+    }
+    
     headers["User-Agent"] = random.choice(agents)
     headers["Referer"] = random.choice(refers)
     return headers
 
 
-def my_request_get(url, params=None) -> requests.Response | None:
+def my_request_get(url, params=None,req_img=False) -> requests.Response | None:
     req_count = 0
     while True:
         try:
             req_count += 1
             response = requests.get(
-                url, params=params, headers=gen_random_headers(), timeout=5
+                url, params=params, headers=gen_random_headers(req_img), timeout=5
             )
             break
         except requests.exceptions.RequestException as e:
@@ -51,7 +61,7 @@ def my_request_get(url, params=None) -> requests.Response | None:
 
 
 def download_images(download_url, save_name):
-    response = my_request_get(download_url)
+    response = my_request_get(download_url,req_img=True)
     if response is None:
         return None
 
@@ -93,7 +103,7 @@ def download_images_and_prompts(save_dir, save_name, image: dict, resources=Fals
     if image["url"] is None:
         return
     download_url = image["url"]
-    response = my_request_get(download_url)
+    response = my_request_get(download_url,req_img=True)
     if response is None:
         return
     # Save the model image to a file
@@ -104,7 +114,7 @@ def download_images_and_prompts(save_dir, save_name, image: dict, resources=Fals
             f.write(process_meta(image["meta"]))
     if resources and image["postId"] is not None:
         with open((save_dir + "\\{}_resources.txt").format(save_name), "w") as f:
-            f.write(f"postId: {image['postId']}\n")
+            f.write(f"postId: {image['postId']}\n\n")
             if image["meta"]["resources"] is not None:
                 for item in image["meta"]["resources"]:
                     f.write(f"name: {item['name']} type: {item['type']}\n")
@@ -130,7 +140,12 @@ def load_all_image_local(dir, cache=False):
 def load_image_prompts(imagepath):
     txt_path = imagepath.split(".jpg")[0] + ".txt"
     if not os.path.exists(txt_path):
-        return None
+        try:
+            image = Image.open(imagepath)
+            textinfo, _ = read_info_from_image(image)
+            return textinfo
+        except Exception:
+            return None
 
     with open(txt_path, "r") as f:
         # read all
